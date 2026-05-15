@@ -1,9 +1,14 @@
-import { useState, useCallback } from 'react'
+// CycleScript.jsx
+// Requires: @fontsource/barlow, @fontsource/barlow-condensed, @fontsource/dm-mono
+// Or just load from Google Fonts in your index.html:
+// <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@400;500&display=swap" rel="stylesheet">
+
+import { useState, useCallback } from 'react';
 
 const TOPICS = [
   'Training & FTP', 'Nutrition', 'Gear & Tech', 'Race Strategy',
   'Recovery', 'Route & Climbing', 'Psychology', 'Beginner Tips',
-]
+];
 
 const FORMATS = [
   { value: 'listicle', label: 'Listicle — "5 ways to..."' },
@@ -12,23 +17,29 @@ const FORMATS = [
   { value: 'mistake', label: 'Common mistakes' },
   { value: 'comparison', label: 'Comparison — "X vs Y"' },
   { value: 'challenge', label: '30-day challenge' },
-]
+];
 
 const LEVELS = [
   { value: 'amateur', label: 'Amateur / recreational' },
   { value: 'intermediate', label: 'Intermediate (3–4 W/kg)' },
   { value: 'beginner', label: 'Complete beginner' },
   { value: 'all', label: 'All levels' },
-]
+];
 
-const HUMOUR_LABELS = ['straight-laced', 'light banter', 'taking the mick', 'full roast mode']
+const LENGTHS = [
+  { value: 'short', label: 'Short — 2-3 mins', words: '300-400 words, maximum 2 punchy main points, no fluff' },
+  { value: 'medium', label: 'Medium — 4-5 mins (recommended)', words: '500-650 words, 3 main points' },
+  { value: 'long', label: 'Long — 7-8 mins (high credit cost)', words: '900-1100 words, 5 main points' },
+];
+
+const HUMOUR_LABELS = ['straight-laced', 'light banter', 'taking the mick', 'full roast mode'];
 
 const HUMOUR_PROMPTS = [
   'Clean, no-nonsense. Occasional dry wit fine.',
   'Light cycling humour — Strava obsession, suffering on climbs, joy of a tailwind.',
   'Lad banter tone. Take the mick out of gear snobs (£8k bike, still 2 W/kg), weight weenies, Strava KOM hunters. Affectionate but pointed. 2-3 funny lines per section minimum.',
-  'Full comedian-coach. Every section needs a laugh-out-loud moment. Roast the culture relentlessly — bloke who upgrades groupset before learning to corner, guy in full pro kit on a 10-mile commute. Advice still solid — humour is the delivery vehicle.',
-]
+  'Full comedian-coach. Every section needs a laugh-out-loud moment. Roast the culture — bloke who upgrades groupset before learning to corner, guy in full pro kit on a 10-mile commute. Advice still solid — humour is the delivery vehicle.',
+];
 
 const FMT_MAP = {
   listicle: 'listicle ("5 ways to...")',
@@ -37,30 +48,205 @@ const FMT_MAP = {
   mistake: 'common mistakes ("Why you\'re doing X wrong")',
   comparison: 'comparison ("X vs Y")',
   challenge: '30-day challenge',
-}
+};
 
 const LVL_MAP = {
   amateur: 'amateur/recreational cyclists',
   intermediate: 'intermediate cyclists targeting 3-4 W/kg',
   beginner: 'complete beginners',
   all: 'cyclists of all levels',
-}
+};
+
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
+const S = {
+  wrap: {
+    background: '#0a0a0a', color: '#f5f2ed', fontFamily: "'Barlow', sans-serif",
+    minHeight: '100vh', display: 'flex', flexDirection: 'column',
+  },
+  header: {
+    borderBottom: '1px solid #2a2a2a', padding: '0.75rem 1.25rem',
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+  },
+  logo: {
+    fontFamily: "'Barlow Condensed', sans-serif", fontSize: '1.4rem',
+    fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase',
+  },
+  logoAccent: { color: '#e8ff47' },
+  headerTag: {
+    fontFamily: "'DM Mono', monospace", fontSize: '0.55rem', color: '#888',
+    letterSpacing: '0.1em', textTransform: 'uppercase',
+    border: '1px solid #444', padding: '3px 8px',
+  },
+  main: { display: 'grid', gridTemplateColumns: '300px 1fr', flex: 1 },
+  leftPanel: {
+    borderRight: '1px solid #2a2a2a', display: 'flex', flexDirection: 'column',
+  },
+  leftScroll: {
+    flex: 1, overflowY: 'auto', padding: '1rem',
+    display: 'flex', flexDirection: 'column', gap: '1rem',
+  },
+  leftFooter: {
+    padding: '0.75rem 1rem', borderTop: '1px solid #2a2a2a',
+    display: 'flex', flexDirection: 'column', gap: '6px', background: '#0a0a0a',
+  },
+  sLabel: {
+    fontFamily: "'DM Mono', monospace", fontSize: '0.55rem', letterSpacing: '0.15em',
+    textTransform: 'uppercase', color: '#888', marginBottom: '0.4rem',
+  },
+  topicGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' },
+  topicBtn: (active) => ({
+    background: active ? '#e8ff47' : '#1a1a1a',
+    border: `1px solid ${active ? '#e8ff47' : '#2a2a2a'}`,
+    color: active ? '#0a0a0a' : '#bbb',
+    fontFamily: "'Barlow', sans-serif", fontSize: '0.68rem',
+    padding: '6px 7px', cursor: 'pointer', textAlign: 'left',
+    lineHeight: 1.3, fontWeight: active ? 500 : 400,
+    transition: 'all 0.12s',
+  }),
+  select: {
+    width: '100%', background: '#1a1a1a', border: '1px solid #2a2a2a',
+    color: '#f5f2ed', fontFamily: "'Barlow', sans-serif", fontSize: '0.78rem',
+    padding: '8px 10px', appearance: 'none', outline: 'none',
+  },
+  textarea: {
+    width: '100%', background: '#1a1a1a', border: '1px solid #2a2a2a',
+    color: '#f5f2ed', fontFamily: "'Barlow', sans-serif", fontSize: '0.78rem',
+    padding: '8px 10px', outline: 'none', resize: 'none',
+    boxSizing: 'border-box',
+  },
+  humourRow: { display: 'flex', alignItems: 'center', gap: '8px' },
+  humourVal: {
+    fontFamily: "'DM Mono', monospace", fontSize: '0.62rem', color: '#e8ff47',
+    minWidth: '105px', textAlign: 'right',
+  },
+  genBtn: (disabled) => ({
+    background: disabled ? '#444' : '#e8ff47',
+    color: disabled ? '#888' : '#0a0a0a',
+    border: 'none', fontFamily: "'Barlow Condensed', sans-serif",
+    fontSize: '1rem', fontWeight: 700, letterSpacing: '0.08em',
+    textTransform: 'uppercase', padding: '11px', cursor: disabled ? 'not-allowed' : 'pointer',
+    transition: 'all 0.12s', width: '100%',
+  }),
+  batchBtn: (disabled) => ({
+    background: 'transparent', color: disabled ? '#555' : '#888',
+    border: `1px solid ${disabled ? '#333' : '#444'}`,
+    fontFamily: "'DM Mono', monospace", fontSize: '0.62rem',
+    letterSpacing: '0.08em', textTransform: 'uppercase',
+    padding: '9px', cursor: disabled ? 'not-allowed' : 'pointer',
+    transition: 'all 0.12s', width: '100%',
+  }),
+  rightPanel: { display: 'flex', flexDirection: 'column' },
+  outHeader: {
+    borderBottom: '1px solid #2a2a2a', padding: '0.65rem 1.25rem',
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+  },
+  outMeta: { fontFamily: "'DM Mono', monospace", fontSize: '0.6rem', color: '#888' },
+  outActions: { display: 'flex', gap: '5px' },
+  actBtn: {
+    background: 'transparent', border: '1px solid #444', color: '#bbb',
+    fontFamily: "'DM Mono', monospace", fontSize: '0.6rem',
+    textTransform: 'uppercase', padding: '4px 9px', cursor: 'pointer',
+  },
+  outBody: { flex: 1, overflowY: 'auto', padding: '1.25rem' },
+  empty: {
+    display: 'flex', flexDirection: 'column', alignItems: 'center',
+    justifyContent: 'center', height: '100%', gap: '0.75rem', opacity: 0.25,
+  },
+  emptyBig: {
+    fontFamily: "'Barlow Condensed', sans-serif", fontSize: '2.5rem',
+    fontWeight: 800, color: '#2a2a2a',
+  },
+  emptySm: {
+    fontFamily: "'DM Mono', monospace", fontSize: '0.6rem', color: '#888',
+    letterSpacing: '0.1em', textTransform: 'uppercase',
+  },
+  scriptTitle: {
+    fontFamily: "'Barlow Condensed', sans-serif", fontSize: '1.5rem',
+    fontWeight: 800, lineHeight: 1.1, textTransform: 'uppercase',
+    color: '#e8ff47', marginBottom: '0.4rem',
+  },
+  statsRow: {
+    display: 'flex', gap: '1.25rem', marginBottom: '1.1rem',
+    paddingBottom: '1.1rem', borderBottom: '1px solid #2a2a2a',
+  },
+  statVal: { fontFamily: "'DM Mono', monospace", fontSize: '0.75rem', color: '#f5f2ed' },
+  statKey: {
+    fontFamily: "'DM Mono', monospace", fontSize: '0.52rem', color: '#888',
+    textTransform: 'uppercase', letterSpacing: '0.08em',
+  },
+  secTag: {
+    fontFamily: "'DM Mono', monospace", fontSize: '0.52rem', letterSpacing: '0.12em',
+    textTransform: 'uppercase', color: '#ff6b35', display: 'inline-block',
+    border: '1px solid #ff6b35', padding: '2px 6px', marginBottom: '0.35rem', opacity: 0.85,
+  },
+  secBody: { fontSize: '0.84rem', lineHeight: 1.8, color: '#bbb', marginBottom: '1rem' },
+  hookBody: {
+    fontSize: '0.9rem', fontWeight: 500, color: '#f5f2ed',
+    lineHeight: 1.7, marginBottom: '1rem',
+  },
+  broll: {
+    fontFamily: "'DM Mono', monospace", fontSize: '0.58rem', color: '#888',
+    borderLeft: '2px solid #444', paddingLeft: '7px', marginBottom: '1rem',
+  },
+  descBox: {
+    background: '#1a1a1a', border: '1px solid #2a2a2a',
+    borderLeft: '3px solid #ff6b35', padding: '0.9rem', marginTop: '0.5rem',
+  },
+  descLbl: {
+    fontFamily: "'DM Mono', monospace", fontSize: '0.52rem', letterSpacing: '0.12em',
+    textTransform: 'uppercase', color: '#ff6b35', marginBottom: '0.4rem',
+  },
+  descText: { fontSize: '0.76rem', lineHeight: 1.7, color: '#bbb' },
+  tagsRow: { display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '0.6rem' },
+  tag: {
+    fontFamily: "'DM Mono', monospace", fontSize: '0.58rem', color: '#888',
+    border: '1px solid #444', padding: '2px 6px',
+  },
+  batchItem: {
+    background: '#1a1a1a', border: '1px solid #2a2a2a', padding: '9px 11px',
+    cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '9px',
+    marginBottom: '4px', transition: 'all 0.1s',
+  },
+  batchNum: { fontFamily: "'DM Mono', monospace", fontSize: '0.58rem', color: '#888', minWidth: '20px' },
+  batchTitle: { fontSize: '0.76rem', color: '#bbb', lineHeight: 1.3, flex: 1 },
+  batchTag: {
+    fontFamily: "'DM Mono', monospace", fontSize: '0.55rem', color: '#888',
+    border: '1px solid #444', padding: '2px 5px', whiteSpace: 'nowrap',
+  },
+  errBox: {
+    background: '#1a0000', border: '1px solid #ff4444',
+    borderLeft: '3px solid #ff4444', padding: '1rem',
+    fontFamily: "'DM Mono', monospace",
+  },
+  errTitle: { color: '#ff6666', fontSize: '0.58rem', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '0.5rem' },
+  errMsg: { color: '#ffaaaa', fontSize: '0.76rem', marginBottom: '0.75rem', lineHeight: 1.6 },
+  errRaw: {
+    color: '#ff8888', whiteSpace: 'pre-wrap', wordBreak: 'break-all',
+    fontSize: '0.58rem', background: '#0d0000', padding: '0.6rem',
+    maxHeight: '150px', overflowY: 'auto',
+  },
+};
+
+// ─── Component ─────────────────────────────────────────────────────────────────
 
 export default function CycleScript() {
-  const [topic, setTopic] = useState('Training & FTP')
-  const [format, setFormat] = useState('listicle')
-  const [level, setLevel] = useState('amateur')
-  const [humour, setHumour] = useState(2)
-  const [custom, setCustom] = useState('')
-  const [state, setState] = useState('idle')
-  const [script, setScript] = useState(null)
-  const [batches, setBatches] = useState([])
-  const [error, setError] = useState({ msg: '', raw: '' })
-  const [copied, setCopied] = useState('')
+  const [topic, setTopic] = useState('Training & FTP');
+  const [format, setFormat] = useState('listicle');
+  const [level, setLevel] = useState('amateur');
+  const [length, setLength] = useState('medium');
+  const [humour, setHumour] = useState(2);
+  const [custom, setCustom] = useState('');
+  const [state, setState] = useState('idle'); // idle | loading | script | batch | error
+  const [script, setScript] = useState(null);
+  const [batches, setBatches] = useState([]);
+  const [error, setError] = useState({ msg: '', raw: '' });
+  const [copied, setCopied] = useState('');
 
-  const busy = state === 'loading'
+  const busy = state === 'loading';
 
   const callAPI = useCallback(async (prompt, maxTokens = 4000) => {
+    // Calls your Railway proxy — update this path if needed
     const res = await fetch('/api/claude', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -69,236 +255,207 @@ export default function CycleScript() {
         max_tokens: maxTokens,
         messages: [{ role: 'user', content: prompt }],
       }),
-    })
-    const data = await res.json()
-    if (data.error) throw new Error(data.error.message || JSON.stringify(data.error))
-    return (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('')
-  }, [])
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
+    return (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
+  }, []);
 
-  const buildScriptPrompt = useCallback(() => `You are a YouTube script writer for a faceless cycling channel targeting ${LVL_MAP[level]}.
+  const buildScriptPrompt = useCallback(() => {
+    const lengthObj = LENGTHS.find(l => l.value === length);
+    return `You are a YouTube script writer for a faceless cycling channel targeting ${LVL_MAP[level]}.
 
-Write a complete YouTube video script in ${FMT_MAP[format]} format about: "${topic}".${custom ? `\nAngle: ${custom}` : ''}
+Write a YouTube video script in ${FMT_MAP[format]} format about: "${topic}".${custom ? `\nAngle: ${custom}` : ''}
+
+LENGTH: ${lengthObj.words}. Be concise and punchy — do not pad. Every sentence must earn its place.
 
 TONE: ${HUMOUR_PROMPTS[humour]}
 
 Return ONLY valid JSON (no markdown, no backticks, no explanation):
-{"title":"YouTube title max 60 chars","hook":"first 15 seconds narration","intro":"30-second intro narration","sections":[{"heading":"heading","script":"2-3 paragraphs narration","b_roll":"B-roll suggestion for InVideo"}],"cta":"30-second outro with CTA","description":"150-word SEO YouTube description","tags":"10 comma-separated tags","duration_est":"X-Y mins","word_count":800}`,
-  [topic, format, level, humour, custom])
+{"title":"YouTube title max 60 chars","hook":"first 15 seconds narration","intro":"20-second intro narration","sections":[{"heading":"heading","script":"narration for this point — tight and punchy","b_roll":"B-roll suggestion for InVideo"}],"cta":"20-second outro with CTA","description":"120-word SEO YouTube description","tags":"10 comma-separated tags","duration_est":"X-Y mins","word_count":400}`;
+  }, [topic, format, level, length, humour, custom]);
 
   const generateScript = useCallback(async () => {
-    setState('loading')
+    setState('loading');
     try {
-      const raw = await callAPI(buildScriptPrompt(), 4000)
-      const parsed = JSON.parse(raw.replace(/```json|```/g, '').trim())
-      setScript(parsed)
-      setState('script')
+      const raw = await callAPI(buildScriptPrompt(), 4000);
+      const parsed = JSON.parse(raw.replace(/```json|```/g, '').trim());
+      setScript(parsed);
+      setState('script');
     } catch (e) {
-      setError({ msg: e.message, raw: '' })
-      setState('error')
+      setError({ msg: e.message, raw: '' });
+      setState('error');
     }
-  }, [callAPI, buildScriptPrompt])
+  }, [callAPI, buildScriptPrompt]);
 
   const generateBatch = useCallback(async () => {
-    setState('loading')
-    const hint = humour >= 2 ? ' Lad banter tone — titles should hint at irreverence (e.g. "Why Your £5k Bike Won\'t Fix Your 2 W/kg Problem").' : ''
-    const prompt = `Generate 10 YouTube video title ideas for a cycling channel targeting ${LVL_MAP[level]} cyclists. Mix formats.${hint}\nReturn ONLY a JSON array, no markdown:\n[{"title":"...","format":"listicle|myth|explainer|mistake|comparison","topic":"topic area"}]`
+    setState('loading');
+    const hint = humour >= 2
+      ? ' Lad banter tone — titles should hint at irreverence (e.g. "Why Your £5k Bike Won\'t Fix Your 2 W/kg Problem").'
+      : '';
+    const prompt = `Generate 10 YouTube video title ideas for a cycling channel targeting ${LVL_MAP[level]} cyclists. Mix formats.${hint}\nReturn ONLY a JSON array, no markdown:\n[{"title":"...","format":"listicle|myth|explainer|mistake|comparison","topic":"topic area"}]`;
     try {
-      const raw = await callAPI(prompt, 2000)
-      setBatches(JSON.parse(raw.replace(/```json|```/g, '').trim()))
-      setState('batch')
+      const raw = await callAPI(prompt, 2000);
+      const ideas = JSON.parse(raw.replace(/```json|```/g, '').trim());
+      setBatches(ideas);
+      setState('batch');
     } catch (e) {
-      setError({ msg: e.message, raw: '' })
-      setState('error')
+      setError({ msg: e.message, raw: '' });
+      setState('error');
     }
-  }, [callAPI, level, humour])
+  }, [callAPI, level, humour]);
 
   const pickBatch = (idea) => {
-    setTopic(idea.topic)
-    setFormat(idea.format)
-    setCustom(`Specifically: ${idea.title}`)
-    setTimeout(generateScript, 50)
-  }
+    setTopic(idea.topic);
+    setFormat(idea.format);
+    setCustom(`Specifically: ${idea.title}`);
+    setTimeout(generateScript, 50);
+  };
 
   const copyText = (text, label) => {
-    navigator.clipboard.writeText(text)
-    setCopied(label)
-    setTimeout(() => setCopied(''), 1500)
-  }
+    navigator.clipboard.writeText(text);
+    setCopied(label);
+    setTimeout(() => setCopied(''), 1500);
+  };
 
   const scriptText = script
     ? `${script.title}\n\n[HOOK]\n${script.hook}\n\n[INTRO]\n${script.intro}\n\n` +
       (script.sections || []).map(s => `[${s.heading.toUpperCase()}]\n${s.script}\nB-ROLL: ${s.b_roll}`).join('\n\n') +
       `\n\n[CTA]\n${script.cta}`
-    : ''
+    : '';
 
-  const descText = script ? `${script.description}\n\nTAGS: ${script.tags}` : ''
+  const descText = script ? `${script.description}\n\nTAGS: ${script.tags}` : '';
 
-  // ── Styles ──────────────────────────────────────────────────────────────────
-
-  const c = {
-    black: '#0a0a0a', white: '#f5f2ed', accent: '#e8ff47', accent2: '#ff6b35',
-    g1: '#1a1a1a', g2: '#2a2a2a', g3: '#444', g4: '#888', g5: '#bbb',
-  }
-
-  const css = {
-    wrap: { background: c.black, color: c.white, fontFamily: "'Barlow', sans-serif", minHeight: '100vh', display: 'flex', flexDirection: 'column' },
-    header: { borderBottom: `1px solid ${c.g2}`, padding: '0.75rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
-    logo: { fontFamily: "'Barlow Condensed', sans-serif", fontSize: '1.5rem', fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase' },
-    main: { display: 'grid', gridTemplateColumns: '300px 1fr', flex: 1, minHeight: 0 },
-    leftPanel: { borderRight: `1px solid ${c.g2}`, display: 'flex', flexDirection: 'column', height: 'calc(100vh - 57px)', position: 'sticky', top: 0 },
-    leftScroll: { flex: 1, overflowY: 'auto', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' },
-    leftFooter: { padding: '0.75rem 1rem', borderTop: `1px solid ${c.g2}`, display: 'flex', flexDirection: 'column', gap: '6px', background: c.black },
-    sLabel: { fontFamily: "'DM Mono', monospace", fontSize: '0.55rem', letterSpacing: '0.15em', textTransform: 'uppercase', color: c.g4, marginBottom: '0.4rem' },
-    topicGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' },
-    topicBtn: (active) => ({ background: active ? c.accent : c.g1, border: `1px solid ${active ? c.accent : c.g2}`, color: active ? c.black : c.g5, fontFamily: "'Barlow', sans-serif", fontSize: '0.68rem', padding: '7px 8px', cursor: 'pointer', textAlign: 'left', lineHeight: 1.3, fontWeight: active ? 500 : 400, transition: 'all 0.12s' }),
-    select: { width: '100%', background: c.g1, border: `1px solid ${c.g2}`, color: c.white, fontFamily: "'Barlow', sans-serif", fontSize: '0.8rem', padding: '8px 10px', appearance: 'none', outline: 'none' },
-    textarea: { width: '100%', background: c.g1, border: `1px solid ${c.g2}`, color: c.white, fontFamily: "'Barlow', sans-serif", fontSize: '0.8rem', padding: '8px 10px', outline: 'none', resize: 'none', boxSizing: 'border-box' },
-    genBtn: { background: busy ? c.g3 : c.accent, color: busy ? c.g4 : c.black, border: 'none', fontFamily: "'Barlow Condensed', sans-serif", fontSize: '1rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', padding: '12px', cursor: busy ? 'not-allowed' : 'pointer', width: '100%' },
-    batchBtn: { background: 'transparent', color: busy ? c.g3 : c.g4, border: `1px solid ${busy ? c.g2 : c.g3}`, fontFamily: "'DM Mono', monospace", fontSize: '0.62rem', letterSpacing: '0.08em', textTransform: 'uppercase', padding: '10px', cursor: busy ? 'not-allowed' : 'pointer', width: '100%' },
-    rightPanel: { display: 'flex', flexDirection: 'column' },
-    outHeader: { borderBottom: `1px solid ${c.g2}`, padding: '0.65rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, background: c.black, zIndex: 10 },
-    outMeta: { fontFamily: "'DM Mono', monospace", fontSize: '0.6rem', color: c.g4 },
-    actBtn: { background: 'transparent', border: `1px solid ${c.g3}`, color: c.g5, fontFamily: "'DM Mono', monospace", fontSize: '0.6rem', textTransform: 'uppercase', padding: '4px 10px', cursor: 'pointer' },
-    outBody: { padding: '1.5rem', flex: 1 },
-    empty: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '300px', gap: '0.75rem', opacity: 0.25 },
-    scriptTitle: { fontFamily: "'Barlow Condensed', sans-serif", fontSize: '1.6rem', fontWeight: 800, lineHeight: 1.1, textTransform: 'uppercase', color: c.accent, marginBottom: '0.5rem' },
-    statsRow: { display: 'flex', gap: '1.5rem', marginBottom: '1.25rem', paddingBottom: '1.25rem', borderBottom: `1px solid ${c.g2}` },
-    statVal: { fontFamily: "'DM Mono', monospace", fontSize: '0.78rem', color: c.white },
-    statKey: { fontFamily: "'DM Mono', monospace", fontSize: '0.52rem', color: c.g4, textTransform: 'uppercase', letterSpacing: '0.08em' },
-    secTag: { fontFamily: "'DM Mono', monospace", fontSize: '0.52rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: c.accent2, display: 'inline-block', border: `1px solid ${c.accent2}`, padding: '2px 6px', marginBottom: '0.4rem', opacity: 0.85 },
-    secBody: { fontSize: '0.85rem', lineHeight: 1.8, color: c.g5, marginBottom: '1.1rem' },
-    hookBody: { fontSize: '0.92rem', fontWeight: 500, color: c.white, lineHeight: 1.7, marginBottom: '1.1rem' },
-    broll: { fontFamily: "'DM Mono', monospace", fontSize: '0.58rem', color: c.g4, borderLeft: `2px solid ${c.g3}`, paddingLeft: '8px', marginBottom: '1.1rem' },
-    descBox: { background: c.g1, border: `1px solid ${c.g2}`, borderLeft: `3px solid ${c.accent2}`, padding: '1rem', marginTop: '0.75rem' },
-    descLbl: { fontFamily: "'DM Mono', monospace", fontSize: '0.52rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: c.accent2, marginBottom: '0.4rem' },
-    descText: { fontSize: '0.78rem', lineHeight: 1.7, color: c.g5 },
-    tagsRow: { display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '0.6rem' },
-    tag: { fontFamily: "'DM Mono', monospace", fontSize: '0.58rem', color: c.g4, border: `1px solid ${c.g3}`, padding: '2px 6px' },
-    batchItem: { background: c.g1, border: `1px solid ${c.g2}`, padding: '10px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '5px' },
-    batchNum: { fontFamily: "'DM Mono', monospace", fontSize: '0.58rem', color: c.g4, minWidth: '22px' },
-    batchTitle: { fontSize: '0.78rem', color: c.g5, lineHeight: 1.3, flex: 1 },
-    batchTag: { fontFamily: "'DM Mono', monospace", fontSize: '0.56rem', color: c.g4, border: `1px solid ${c.g3}`, padding: '2px 5px', whiteSpace: 'nowrap' },
-    errBox: { background: '#1a0000', border: '1px solid #ff4444', borderLeft: '3px solid #ff4444', padding: '1rem', fontFamily: "'DM Mono', monospace" },
-  }
+  // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <div style={css.wrap}>
-      <header style={css.header}>
-        <div style={css.logo}>Cycle<span style={{ color: c.accent }}>Script</span></div>
-        <div style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.55rem', color: c.g4, border: `1px solid ${c.g3}`, padding: '3px 8px' }}>AI SCRIPT GENERATOR</div>
+    <div style={S.wrap}>
+      <header style={S.header}>
+        <div style={S.logo}>Cycle<span style={S.logoAccent}>Script</span></div>
+        <div style={S.headerTag}>AI Script Generator</div>
       </header>
 
-      <div style={css.main}>
+      <div style={S.main}>
 
-        {/* LEFT */}
-        <div style={css.leftPanel}>
-          <div style={css.leftScroll}>
+        {/* LEFT PANEL */}
+        <div style={S.leftPanel}>
+          <div style={S.leftScroll}>
+
             <div>
-              <div style={css.sLabel}>Topic</div>
-              <div style={css.topicGrid}>
+              <div style={S.sLabel}>Topic</div>
+              <div style={S.topicGrid}>
                 {TOPICS.map(t => (
-                  <button key={t} style={css.topicBtn(topic === t)} onClick={() => setTopic(t)}>{t}</button>
+                  <button key={t} style={S.topicBtn(topic === t)} onClick={() => setTopic(t)}>{t}</button>
                 ))}
               </div>
             </div>
+
             <div>
-              <div style={css.sLabel}>Format</div>
-              <select style={css.select} value={format} onChange={e => setFormat(e.target.value)}>
+              <div style={S.sLabel}>Format</div>
+              <select style={S.select} value={format} onChange={e => setFormat(e.target.value)}>
                 {FORMATS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
               </select>
             </div>
+
             <div>
-              <div style={css.sLabel}>Rider level</div>
-              <select style={css.select} value={level} onChange={e => setLevel(e.target.value)}>
+              <div style={S.sLabel}>Rider level</div>
+              <select style={S.select} value={level} onChange={e => setLevel(e.target.value)}>
                 {LEVELS.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}
               </select>
             </div>
+
             <div>
-              <div style={css.sLabel}>Banter level</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={S.sLabel}>Video length</div>
+              <select style={S.select} value={length} onChange={e => setLength(e.target.value)}>
+                {LENGTHS.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}
+              </select>
+            </div>
+
+            <div>
+              <div style={S.sLabel}>Banter level</div>
+              <div style={S.humourRow}>
                 <input type="range" min={0} max={3} step={1} value={humour}
-                  style={{ flex: 1, accentColor: c.accent, cursor: 'pointer' }}
+                  style={{ flex: 1, accentColor: '#e8ff47', cursor: 'pointer' }}
                   onChange={e => setHumour(parseInt(e.target.value))} />
-                <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.62rem', color: c.accent, minWidth: '110px', textAlign: 'right' }}>
-                  {HUMOUR_LABELS[humour]}
-                </span>
+                <span style={S.humourVal}>{HUMOUR_LABELS[humour]}</span>
               </div>
             </div>
+
             <div>
-              <div style={css.sLabel}>Custom angle (optional)</div>
-              <textarea style={css.textarea} rows={2}
-                placeholder="e.g. time-crunched riders, winter training in Poland..."
+              <div style={S.sLabel}>Custom angle (optional)</div>
+              <textarea style={S.textarea} rows={2}
+                placeholder="e.g. time-crunched riders, winter training..."
                 value={custom} onChange={e => setCustom(e.target.value)} />
             </div>
+
           </div>
 
-          <div style={css.leftFooter}>
-            <button style={css.genBtn} disabled={busy} onClick={generateScript}>
+          <div style={S.leftFooter}>
+            <button style={S.genBtn(busy)} disabled={busy} onClick={generateScript}>
               {busy ? '⏳ Generating...' : '▶ Generate Script'}
             </button>
-            <button style={css.batchBtn} disabled={busy} onClick={generateBatch}>
+            <button style={S.batchBtn(busy)} disabled={busy} onClick={generateBatch}>
               ⊞ Generate 10 Titles
             </button>
           </div>
         </div>
 
-        {/* RIGHT */}
-        <div style={css.rightPanel}>
-          <div style={css.outHeader}>
-            <div style={css.outMeta}>
+        {/* RIGHT PANEL */}
+        <div style={S.rightPanel}>
+          <div style={S.outHeader}>
+            <div style={S.outMeta}>
               {state === 'idle' && '— awaiting generation —'}
               {state === 'loading' && '— generating —'}
               {state === 'script' && script && `script ready — ${script.word_count || '?'} words · ${script.duration_est || '?'}`}
-              {state === 'batch' && `${batches.length} ideas — click any to write the full script`}
+              {state === 'batch' && `${batches.length} ideas — click any to generate the full script`}
               {state === 'error' && '— generation failed —'}
             </div>
             {state === 'script' && script && (
-              <div style={{ display: 'flex', gap: '6px' }}>
-                <button style={css.actBtn} onClick={() => copyText(scriptText, 'script')}>
+              <div style={S.outActions}>
+                <button style={S.actBtn} onClick={() => copyText(scriptText, 'script')}>
                   {copied === 'script' ? 'Copied!' : 'Copy Script'}
                 </button>
-                <button style={css.actBtn} onClick={() => copyText(descText, 'desc')}>
+                <button style={S.actBtn} onClick={() => copyText(descText, 'desc')}>
                   {copied === 'desc' ? 'Copied!' : 'Copy Description'}
                 </button>
               </div>
             )}
           </div>
 
-          <div style={css.outBody}>
+          <div style={S.outBody}>
+
             {state === 'idle' && (
-              <div style={css.empty}>
-                <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: '2.5rem', fontWeight: 800, color: c.g2 }}>WATTS &amp; WORDS</div>
-                <div style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.6rem', color: c.g4, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Pick a topic and hit generate</div>
+              <div style={S.empty}>
+                <div style={S.emptyBig}>WATTS &amp; WORDS</div>
+                <div style={S.emptySm}>Select topic → generate</div>
               </div>
             )}
 
             {state === 'loading' && (
-              <div style={css.empty}>
-                <div style={{ width: '160px', height: '2px', background: c.g2, overflow: 'hidden' }}>
-                  <style>{`@keyframes bs{0%{transform:translateX(-100%);width:30%}50%{width:60%}100%{transform:translateX(400%);width:30%}}`}</style>
-                  <div style={{ height: '100%', background: c.accent, animation: 'bs 1.2s ease-in-out infinite', width: '30%' }} />
+              <div style={{ ...S.empty, opacity: 1 }}>
+                <div style={{ width: '160px', height: '2px', background: '#2a2a2a', overflow: 'hidden' }}>
+                  <div style={{ height: '100%', background: '#e8ff47', animation: 'barSlide 1.2s ease-in-out infinite', width: '30%' }} />
                 </div>
-                <div style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.62rem', color: c.g4, letterSpacing: '0.1em', textTransform: 'uppercase' }}>writing your script...</div>
+                <div style={S.emptySm}>generating script...</div>
+                <style>{`@keyframes barSlide{0%{transform:translateX(-100%);width:30%}50%{width:60%}100%{transform:translateX(400%);width:30%}}`}</style>
               </div>
             )}
 
             {state === 'error' && (
-              <div style={css.errBox}>
-                <div style={{ color: '#ff6666', fontSize: '0.6rem', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '0.5rem' }}>Error</div>
-                <div style={{ color: '#ffaaaa', fontSize: '0.78rem', marginBottom: '0.75rem', lineHeight: 1.6 }}>{error.msg}</div>
-                <pre style={{ color: '#ff8888', whiteSpace: 'pre-wrap', wordBreak: 'break-all', fontSize: '0.6rem', background: '#0d0000', padding: '0.6rem', maxHeight: '150px', overflowY: 'auto' }}>
-                  {error.raw || 'Check that ANTHROPIC_API_KEY is set in Railway environment variables.'}
-                </pre>
+              <div style={S.errBox}>
+                <div style={S.errTitle}>Error</div>
+                <div style={S.errMsg}>{error.msg}</div>
+                <pre style={S.errRaw}>{error.raw || '(no response body — check your /api/claude proxy is running)'}</pre>
               </div>
             )}
 
             {state === 'batch' && (
               <div>
                 {batches.map((idea, i) => (
-                  <div key={i} style={css.batchItem} onClick={() => pickBatch(idea)}>
-                    <span style={css.batchNum}>{String(i + 1).padStart(2, '0')}</span>
-                    <span style={css.batchTitle}>{idea.title}</span>
-                    <span style={css.batchTag}>{idea.format}</span>
+                  <div key={i} style={S.batchItem} onClick={() => pickBatch(idea)}>
+                    <span style={S.batchNum}>{String(i + 1).padStart(2, '0')}</span>
+                    <span style={S.batchTitle}>{idea.title}</span>
+                    <span style={S.batchTag}>{idea.format}</span>
                   </div>
                 ))}
               </div>
@@ -306,39 +463,46 @@ Return ONLY valid JSON (no markdown, no backticks, no explanation):
 
             {state === 'script' && script && (
               <div>
-                <div style={css.scriptTitle}>{script.title}</div>
-                <div style={css.statsRow}>
-                  <div><div style={css.statVal}>{script.duration_est || '?'}</div><div style={css.statKey}>Duration</div></div>
-                  <div><div style={css.statVal}>{(script.word_count || 0).toLocaleString()}</div><div style={css.statKey}>Words</div></div>
-                  <div><div style={css.statVal}>{topic}</div><div style={css.statKey}>Topic</div></div>
+                <div style={S.scriptTitle}>{script.title}</div>
+                <div style={S.statsRow}>
+                  <div><div style={S.statVal}>{script.duration_est || '?'}</div><div style={S.statKey}>Duration</div></div>
+                  <div><div style={S.statVal}>{(script.word_count || 0).toLocaleString()}</div><div style={S.statKey}>Words</div></div>
+                  <div><div style={S.statVal}>{topic}</div><div style={S.statKey}>Topic</div></div>
                 </div>
-                <div style={css.secTag}>Hook — 0:00</div>
-                <div style={css.hookBody}>{script.hook}</div>
-                <div style={css.secTag}>Intro — 0:15</div>
-                <div style={css.secBody}>{script.intro}</div>
+
+                <div style={S.secTag}>Hook — 0:00</div>
+                <div style={S.hookBody}>{script.hook}</div>
+
+                <div style={S.secTag}>Intro — 0:15</div>
+                <div style={S.secBody}>{script.intro}</div>
+
                 {(script.sections || []).map((sec, i) => (
                   <div key={i}>
-                    <div style={css.secTag}>{sec.heading}</div>
-                    <div style={css.secBody}>{sec.script}</div>
-                    <div style={css.broll}>B-ROLL → {sec.b_roll}</div>
+                    <div style={S.secTag}>{sec.heading}</div>
+                    <div style={S.secBody}>{sec.script}</div>
+                    <div style={S.broll}>B-ROLL → {sec.b_roll}</div>
                   </div>
                 ))}
-                <div style={css.secTag}>CTA / Outro</div>
-                <div style={css.secBody}>{script.cta}</div>
-                <div style={css.descBox}>
-                  <div style={css.descLbl}>YouTube Description + Tags</div>
-                  <div style={css.descText}>{script.description}</div>
-                  <div style={css.tagsRow}>
+
+                <div style={S.secTag}>CTA / Outro</div>
+                <div style={S.secBody}>{script.cta}</div>
+
+                <div style={S.descBox}>
+                  <div style={S.descLbl}>YouTube Description + Tags</div>
+                  <div style={S.descText}>{script.description}</div>
+                  <div style={S.tagsRow}>
                     {(script.tags || '').split(',').map((t, i) => (
-                      <span key={i} style={css.tag}>{t.trim()}</span>
+                      <span key={i} style={S.tag}>{t.trim()}</span>
                     ))}
                   </div>
                 </div>
               </div>
             )}
+
           </div>
         </div>
+
       </div>
     </div>
-  )
+  );
 }
