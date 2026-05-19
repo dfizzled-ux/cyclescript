@@ -10,7 +10,35 @@ const TOPICS = [
   'Recovery', 'Route & Climbing', 'Psychology', 'Beginner Tips',
 ];
 
+const DISCIPLINES = [
+  { value: 'road', label: '🚴 Road Cycling' },
+  { value: 'gravel', label: '🪨 Gravel Biking' },
+  { value: 'mtb', label: '🏔️ Mountain Biking' },
+  { value: 'commuting', label: '🏙️ Commuting' },
+  { value: 'indoor', label: '🖥️ Zwift / Indoor' },
+  { value: 'general', label: '🚲 All Cycling' },
+];
+
+const TOPICS_BY_DISCIPLINE = {
+  road: ['Training & FTP', 'Nutrition', 'Gear & Tech', 'Race Strategy', 'Recovery', 'Route & Climbing', 'Psychology', 'Beginner Tips'],
+  gravel: ['Route Planning', 'Gear & Kit', 'Nutrition', 'Bike Setup', 'Navigation', 'Endurance', 'Tyre Choice', 'Beginner Tips'],
+  mtb: ['Trail Skills', 'Bike Setup', 'Nutrition', 'Fitness & Training', 'Gear & Tech', 'Safety', 'Trail Etiquette', 'Beginner Tips'],
+  commuting: ['Bike Choice', 'Safety & Visibility', 'Gear & Kit', 'Route Planning', 'Maintenance', 'Weather Riding', 'Locking & Security', 'Beginner Tips'],
+  indoor: ['Zwift Tips', 'Training Plans', 'Setup & Kit', 'Races & Events', 'FTP & Fitness', 'Motivation', 'Recovery', 'Beginner Tips'],
+  general: ['Training & FTP', 'Nutrition', 'Gear & Tech', 'Recovery', 'Psychology', 'Bike Maintenance', 'Cycling Culture', 'Beginner Tips'],
+};
+
+const DISCIPLINE_CONTEXT = {
+  road: 'road cyclists',
+  gravel: 'gravel cyclists who love adventure riding on mixed terrain',
+  mtb: 'mountain bikers who ride trails and technical terrain',
+  commuting: 'cycling commuters who ride to work daily',
+  indoor: 'indoor cyclists who train on Zwift and smart trainers',
+  general: 'cyclists of all disciplines',
+};
+
 const FORMATS = [
+  { value: 'short', label: '⚡ YouTube Short — single tip (45-75 sec)' },
   { value: 'listicle', label: 'Listicle — "5 ways to..."' },
   { value: 'myth', label: 'Myth busting — "The truth about..."' },
   { value: 'explainer', label: 'Explainer — "How X actually works"' },
@@ -21,13 +49,14 @@ const FORMATS = [
 
 const LEVELS = [
   { value: 'amateur', label: 'Amateur / recreational' },
-  { value: 'intermediate', label: 'Intermediate (3–4 W/kg)' },
+  { value: 'intermediate', label: 'Intermediate' },
   { value: 'beginner', label: 'Complete beginner' },
   { value: 'all', label: 'All levels' },
 ];
 
 const LENGTHS = [
-  { value: 'short', label: 'Short — 2-3 mins', words: '300-400 words, maximum 2 punchy main points, no fluff' },
+  { value: 'short', label: '⚡ YouTube Short — 45-75 sec', words: '100-130 words maximum. ONE single tip only. Hook (5 sec) → tip → CTA. Extremely punchy, no fluff whatsoever.' },
+  { value: 'short_vid', label: 'Short — 2-3 mins', words: '300-400 words, maximum 2 punchy main points, no fluff' },
   { value: 'medium', label: 'Medium — 4-5 mins (recommended)', words: '500-650 words, 3 main points' },
   { value: 'long', label: 'Long — 7-8 mins (high credit cost)', words: '900-1100 words, 5 main points' },
 ];
@@ -42,6 +71,7 @@ const HUMOUR_PROMPTS = [
 ];
 
 const FMT_MAP = {
+  short: 'YouTube Short (single punchy tip, 45-75 seconds)',
   listicle: 'listicle ("5 ways to...")',
   myth: 'myth-busting ("The truth about...")',
   explainer: 'explainer ("How X actually works")',
@@ -232,12 +262,13 @@ const S = {
 
 export default function CycleScript() {
   const [topic, setTopic] = useState('Training & FTP');
-  const [format, setFormat] = useState('listicle');
+  const [discipline, setDiscipline] = useState('road');
+  const [format, setFormat] = useState('short');
   const [level, setLevel] = useState('amateur');
-  const [length, setLength] = useState('medium');
+  const [length, setLength] = useState('short');
   const [humour, setHumour] = useState(2);
   const [custom, setCustom] = useState('');
-  const [state, setState] = useState('idle'); // idle | loading | script | batch | error
+  const [state, setState] = useState('idle');
   const [script, setScript] = useState(null);
   const [batches, setBatches] = useState([]);
   const [error, setError] = useState({ msg: '', raw: '' });
@@ -245,8 +276,13 @@ export default function CycleScript() {
 
   const busy = state === 'loading';
 
+  // When discipline changes, reset topic to first in that discipline's list
+  const handleDisciplineChange = (d) => {
+    setDiscipline(d);
+    setTopic(TOPICS_BY_DISCIPLINE[d][0]);
+  };
+
   const callAPI = useCallback(async (prompt, maxTokens = 4000) => {
-    // Calls your Railway proxy — update this path if needed
     const res = await fetch('/api/claude', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -263,17 +299,19 @@ export default function CycleScript() {
 
   const buildScriptPrompt = useCallback(() => {
     const lengthObj = LENGTHS.find(l => l.value === length);
-    return `You are a YouTube script writer for a faceless cycling channel targeting ${LVL_MAP[level]}.
+    const isShort = format === 'short' || length === 'short';
+    const disciplineCtx = DISCIPLINE_CONTEXT[discipline];
+    return `You are a YouTube script writer for a faceless cycling channel targeting ${LVL_MAP[level]} who are ${disciplineCtx}.
 
 Write a YouTube video script in ${FMT_MAP[format]} format about: "${topic}".${custom ? `\nAngle: ${custom}` : ''}
 
-LENGTH: ${lengthObj.words}. Be concise and punchy — do not pad. Every sentence must earn its place.
+LENGTH: ${lengthObj.words}. Be concise and punchy — do not pad. Every sentence must earn its place.${isShort ? '\nThis is a YOUTUBE SHORT — maximum 130 words total. One hook, one tip, one CTA. No intro waffle.' : ''}
 
 TONE: ${HUMOUR_PROMPTS[humour]}
 
 Return ONLY valid JSON (no markdown, no backticks, no explanation):
-{"title":"YouTube title max 60 chars","hook":"first 15 seconds narration","intro":"20-second intro narration","sections":[{"heading":"heading","script":"narration for this point — tight and punchy","b_roll":"B-roll suggestion for InVideo"}],"cta":"20-second outro with CTA","description":"120-word SEO YouTube description","tags":"10 comma-separated tags","duration_est":"X-Y mins","word_count":400}`;
-  }, [topic, format, level, length, humour, custom]);
+{"title":"YouTube title max 60 chars","hook":"punchy opening line","intro":"${isShort ? 'skip — leave empty string' : '20-second intro'}","sections":[{"heading":"heading","script":"narration — tight and punchy","b_roll":"B-roll suggestion"}],"cta":"${isShort ? '10-second' : '20-second'} outro with CTA","description":"120-word SEO YouTube description","tags":"10 comma-separated tags","duration_est":"${isShort ? '45-75 sec' : 'X-Y mins'}","word_count":${isShort ? 120 : 400}}`;
+  }, [topic, discipline, format, level, length, humour, custom]);
 
   const generateScript = useCallback(async () => {
     setState('loading');
@@ -342,9 +380,20 @@ Return ONLY valid JSON (no markdown, no backticks, no explanation):
           <div style={S.leftScroll}>
 
             <div>
+              <div style={S.sLabel}>Discipline</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '4px' }}>
+                {DISCIPLINES.map(d => (
+                  <button key={d.value} style={S.topicBtn(discipline === d.value)} onClick={() => handleDisciplineChange(d.value)}>
+                    {d.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
               <div style={S.sLabel}>Topic</div>
               <div style={S.topicGrid}>
-                {TOPICS.map(t => (
+                {TOPICS_BY_DISCIPLINE[discipline].map(t => (
                   <button key={t} style={S.topicBtn(topic === t)} onClick={() => setTopic(t)}>{t}</button>
                 ))}
               </div>
